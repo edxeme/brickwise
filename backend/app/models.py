@@ -34,6 +34,38 @@ class Category(str, enum.Enum):
     MERCADO = "mercado"
 
 
+class Team(Base):
+    """Equipo que agrupa usuarios y proyectos."""
+
+    __tablename__ = "teams"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(160), unique=True)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    users: Mapped[list["User"]] = relationship(back_populates="team")
+    projects: Mapped[list["Project"]] = relationship(back_populates="team")
+
+
+class User(Base):
+    """Usuario autenticado, miembro de un equipo."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(200), unique=True)
+    password_hash: Mapped[str] = mapped_column(String(200))
+    name: Mapped[str] = mapped_column(String(160))
+    team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"))
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    team: Mapped[Team] = relationship(back_populates="users")
+
+
 class Project(Base):
     __tablename__ = "projects"
 
@@ -43,10 +75,17 @@ class Project(Base):
     typology: Mapped[Typology] = mapped_column(Enum(Typology, name="typology"))
     area_m2: Mapped[float] = mapped_column(Numeric(12, 2))
     budget_cop: Mapped[float] = mapped_column(Numeric(16, 2))
+    team_id: Mapped[int | None] = mapped_column(
+        ForeignKey("teams.id"), nullable=True
+    )
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
+    team: Mapped[Team | None] = relationship(back_populates="projects")
+    alternatives: Mapped[list["SiteAlternative"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
     criteria: Mapped[list["Criterion"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
@@ -64,6 +103,9 @@ class Criterion(Base):
     project_id: Mapped[int] = mapped_column(
         ForeignKey("projects.id", ondelete="CASCADE")
     )
+    alternative_id: Mapped[int | None] = mapped_column(
+        ForeignKey("site_alternatives.id", ondelete="CASCADE"), nullable=True
+    )
     category: Mapped[Category] = mapped_column(
         Enum(Category, name="criterion_category")
     )
@@ -73,6 +115,30 @@ class Criterion(Base):
     notes: Mapped[str | None] = mapped_column(Text, default=None)
 
     project: Mapped[Project] = relationship(back_populates="criteria")
+    alternative: Mapped["SiteAlternative | None"] = relationship(
+        back_populates="criteria"
+    )
+
+
+class SiteAlternative(Base):
+    """Alternativa de emplazamiento de un proyecto, con criterios propios."""
+
+    __tablename__ = "site_alternatives"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE")
+    )
+    name: Mapped[str] = mapped_column(String(160))
+    notes: Mapped[str | None] = mapped_column(Text, default=None)
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    project: Mapped[Project] = relationship(back_populates="alternatives")
+    criteria: Mapped[list["Criterion"]] = relationship(
+        back_populates="alternative", cascade="all, delete-orphan"
+    )
 
 
 class RegulationChunk(Base):
