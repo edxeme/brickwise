@@ -19,12 +19,13 @@ Veinte años de obra dejan una intuición: un proyecto no falla por una sola raz
 | Capa | Herramientas |
 | :--- | :--- |
 | API | FastAPI · Strawberry GraphQL · SQLAlchemy 2.0 |
-| Datos | PostgreSQL 16 · pgvector |
-| Frontend | Nuxt 3 · TailwindCSS |
+| Datos | PostgreSQL 16 · pgvector · Alembic |
+| Auth | JWT (PyJWT) · bcrypt, equipos con scoping de proyectos |
+| Frontend | Nuxt 3 · TailwindCSS · Leaflet |
 | Embeddings | Ollama (`nomic-embed-text`, opcional) |
 | CI | GitHub Actions |
 
-El backend expone `/graphql` (GraphiQL incluido) y `/health`. Sin Alembic por ahora: el `lifespan` de FastAPI crea la extensión `vector` y las tablas al arranque.
+El backend expone `/graphql` (protegido con JWT), `/health`, `/auth/register`, `/auth/login`, `GET /projects/{id}/report.md` y `POST /setbacks/preview`. El `lifespan` de FastAPI crea la extensión `vector` y las tablas al arranque; el esquema también se gestiona con Alembic (`backend/alembic.ini`, migraciones en `backend/migrations`).
 
 ## Puesta en marcha
 
@@ -32,9 +33,10 @@ El backend expone `/graphql` (GraphiQL incluido) y `/health`. Sin Alembic por ah
 # 1) Base de datos
 docker compose up -d db
 
-# 2) Backend (FastAPI en :8000)
+# 2) Esquema con Alembic (o simplemente arranca el backend: create_all lo cubre)
 cd backend
 python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+.venv/bin/alembic upgrade head
 .venv/bin/uvicorn app.main:app --reload --port 8000
 
 # 3) Frontend (Nuxt en :3000)
@@ -43,6 +45,8 @@ npm install
 npm run dev
 ```
 
+La primera vez, regístrate desde la interfaz: se crea tu equipo y los proyectos quedan limitados a él.
+
 Con Ollama instalado, activa embeddings semánticos reales:
 
 ```bash
@@ -50,7 +54,7 @@ ollama pull nomic-embed-text
 BRICKWISE_EMBEDDER=ollama uvicorn app.main:app --reload --port 8000
 ```
 
-Variables de entorno: `DATABASE_URL`, `BRICKWISE_EMBEDDER` (`hash` | `ollama`), `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, `BRICKWISE_ALLOWED_ORIGINS`.
+Variables de entorno: `DATABASE_URL`, `BRICKWISE_EMBEDDER` (`hash` | `ollama`), `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, `BRICKWISE_ALLOWED_ORIGINS`, `BRICKWISE_SECRET_KEY` (firma de JWT; usa una clave de 32+ bytes en producción), `BRICKWISE_TOKEN_TTL_DAYS`.
 
 ## Pruebas
 
@@ -60,11 +64,18 @@ cd backend && .venv/bin/pytest -q
 
 ## Roadmap
 
-- Migraciones con Alembic
-- Autenticación y equipos
-- Comparación de alternativas de emplazamiento
-- Mapa interactivo con retiros normativos
-- Exportación de informes de factibilidad
+- [x] Migraciones con Alembic
+- [x] Autenticación y equipos
+- [x] Comparación de alternativas de emplazamiento
+- [x] Mapa interactivo con retiros normativos
+- [x] Exportación de informes de factibilidad
+
+## Próximos pasos
+
+- Roles por equipo (propietario, analista, lectura)
+- Retiros diferenciados por frente (frontal, lateral, posterior)
+- Informes en PDF con la marca del equipo
+- Geometrías de lote persistidas por alternativa
 
 ## Licencia
 
